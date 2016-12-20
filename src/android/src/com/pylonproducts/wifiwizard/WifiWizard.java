@@ -1,7 +1,6 @@
 /*
  * Stuff for Captive Poral v1
  * Copyright 2015 Matt Parsons
- * @amythical Mods Dec 2016 for captive portal - bindProcessToNetwork
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -106,7 +105,8 @@ private CordovaInterface cordova;
         else if(!networkInfo.isConnected()){
            // Log.d("ABC", "WifiWizard networkstuff myLock FALSE ");
             int currentapiVersion = android.os.Build.VERSION.SDK_INT;
-            if (currentapiVersion <= android.os.Build.VERSION_CODES.LOLLIPOP) {
+           // Log.d("ABC","WifiWizard 108 pe ANDROID VERSION = "+currentapiVersion +",lollipop = "+ android.os.Build.VERSION_CODES.LOLLIPOP);
+            if (currentapiVersion <= android.os.Build.VERSION_CODES.LOLLIPOP_MR1) {//MR1 for API 22
                 // Do something for lollipop and below versions
                  this.connectivityManager.setProcessDefaultNetwork(null);
             }else {
@@ -121,8 +121,8 @@ private CordovaInterface cordova;
            // final ConnectivityManager cm = this.connectivityManager;
            //Log.d("ABC", "WifiWizard networkstuff 1111 ");
 
-            NetworkInfo activeInfo = connectivityManager.getActiveNetworkInfo();
-            String activeName = activeInfo.getExtraInfo();
+           // NetworkInfo activeInfo = connectivityManager.getActiveNetworkInfo();
+           // String activeName = activeInfo.getExtraInfo();
           //  Network active = connectivityManager.getActiveNetwork();
           //  Network boundProc = connectivityManager.getBoundNetworkForProcess();
             //Log.d("ABC", "WifiWizard networkstuff 2222XXX BOUND PROC = " + boundProc +",active="+active);
@@ -132,15 +132,19 @@ private CordovaInterface cordova;
           //  if(activeInfo.getExtraInfo().toLowerCase().indexOf("social")<0) {
 
             for (Network net : cm.getAllNetworks()) {
+                Log.d("ABC","WifiWizard before find networks "+net);
                 NetworkInfo netInfo = cm.getNetworkInfo(net);
-              //  Log.d("ABC","WifiWizard found networks "+net +","+netInfo);
+                Log.d("ABC","WifiWizard found networks "+net +","+netInfo);
               //  if(netInfo.isConnected() && (!net.equals(active))) {//Crashes on Mi4i soe next line
                   if(netInfo.isConnected() && (netInfo.getExtraInfo().toLowerCase().indexOf("social")>=0)){// (!netInfo.getExtraInfo().equals(activeName))) {
 
                 boolean bindres = false;
-                   // Log.d("ABC", "WifiWizard networkstuff BINDING TO net Info =" + netInfo);
-                    int currentapiVersion = android.os.Build.VERSION.SDK_INT;
-                    if (currentapiVersion <= android.os.Build.VERSION_CODES.LOLLIPOP) {
+                    Log.d("ABC", "WifiWizard networkstuff BINDING TO net Info =" + netInfo);
+
+                      int currentapiVersion = android.os.Build.VERSION.SDK_INT;
+                     // Log.d("ABC","WifiWizard 156 pe ANDROID VERSION = "+currentapiVersion +",lollipop = "+ android.os.Build.VERSION_CODES.LOLLIPOP);
+
+                      if (currentapiVersion <= android.os.Build.VERSION_CODES.LOLLIPOP_MR1) {//MR1 for API 22
                         // Do something for lollipop and below versions
                         //   Log.d("ABC", "WifiWizard networkstuff 555 ");
 
@@ -461,10 +465,10 @@ public class WifiWizard extends CordovaPlugin {
                         Log.d(TAG, "WifiWizard: Sleep Over ABC.TOY_WIFI_CONN_STATUS ="+ABC.TOY_WIFI_CONNECTION_STATUS);
 
                         if(ABC.TOY_WIFI_CONNECTION_STATUS == 1)
-                            callbackContext.success("connect and bind OK"); // Thread-safe.
+                            callbackContext.success("bindprocess to network OK"); // Thread-safe.
                         else{
                             Log.d("ABC","WifiWizard Conection to WIFI Failed");
-                            callbackContext.error("connect & bind failed"); // Thread-safe.
+                            callbackContext.error("bindProcessToNetwork failed"); // Thread-safe.
 
                         }
                     }//run
@@ -524,8 +528,11 @@ public class WifiWizard extends CordovaPlugin {
         }
 
         if(ssidIsToyNetwork){
+
             int currentapiVersion = android.os.Build.VERSION.SDK_INT;
-            if (currentapiVersion <= android.os.Build.VERSION_CODES.LOLLIPOP){
+            //Log.d("ABC","WifiWizard 530 pe ANDROID VERSION = "+currentapiVersion +",lollipop = "+ android.os.Build.VERSION_CODES.LOLLIPOP);
+
+            if (currentapiVersion <= android.os.Build.VERSION_CODES.LOLLIPOP_MR1){//MR1 stands for API 22
 
                 // Do something for lollipop and below versions
                 // if(this.connectivityManager.getBoundNetworkForProcess()!= null)
