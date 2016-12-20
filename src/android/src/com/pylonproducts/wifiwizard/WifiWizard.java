@@ -1,5 +1,7 @@
 /*
+ * Stuff for Captive Poral v1
  * Copyright 2015 Matt Parsons
+ * @amythical Mods Dec 2016 for captive portal - bindProcessToNetwork
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,12 +17,17 @@
 package com.pylonproducts.wifiwizard;
 
 import org.apache.cordova.*;
+
+import java.lang.Exception;
+import java.lang.Thread;
 import java.util.List;
 
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import android.content.BroadcastReceiver;
+import android.content.Intent;
 import android.net.NetworkInfo;
 import android.net.wifi.WifiManager;
 import android.net.wifi.WifiConfiguration;
@@ -30,7 +37,144 @@ import android.net.wifi.WifiInfo;
 import android.net.wifi.SupplicantState;
 import android.content.Context;
 import android.util.Log;
+import android.net.ConnectivityManager;
+import android.net.Network;
+import android.net.NetworkRequest;
+import android.content.IntentFilter;
+import javax.net.SocketFactory;
+import java.net.Socket;
 
+
+import java.net.URL;
+import java.net.HttpURLConnection;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.Reader;
+import java.io.IOException;
+import java.io.UnsupportedEncodingException;
+import java.net.InetAddress;
+
+class ABC extends BroadcastReceiver{
+    ConnectivityManager connectivityManager;
+    private Network toyNetwork = null;
+    private boolean lockedToNetwork = false;
+    private static boolean myLock = false;
+    private WifiManager wifiManager;
+    public static  int TOY_WIFI_CONNECTION_STATUS = -1;//0-not connected,1 connected,-1=put in checking state
+private CordovaInterface cordova;
+    ABC(ConnectivityManager pconnectivityManager,CordovaInterface pcordova,WifiManager pWifiManager){
+        this.connectivityManager = pconnectivityManager;
+        this.cordova = pcordova;
+        this.wifiManager = pWifiManager;
+    }
+
+    @Override
+    public void onReceive(Context context, Intent intent) {
+        //Log.d("ABC", "WifiWizard: Broadcastreceiver got."+intent.getAction());
+        NetworkInfo networkInfo = intent.getParcelableExtra(WifiManager.EXTRA_NETWORK_INFO);
+        //Log.d("ABC","WifiWizard networkinfo info="+networkInfo);
+        //+",isConnected="+networkInfo.isConnected()+"network="+this.toyNetwork);
+        /*for (Network net : this.connectivityManager.getAllNetworks()) {
+            Log.d("ABC","WifiWizard ***** "+net+"Info = "+this.connectivityManager.getNetworkInfo(net));
+        }*/
+
+        String networkName = networkInfo.getExtraInfo();
+        boolean isNameSocial = false;
+        if((networkName.toLowerCase().indexOf("social")>=0)&& !myLock && networkInfo.isConnected()){
+            myLock = true;
+            //Log.d("ABC", "WifiWizard my Lock True - calling networkStuff once ");
+            // Log.d(TAG,"WifiWizard networkinfo id="+networkInfo.getExtraInfo()+"ds="+networkInfo.getDetailedState()+"isconnected = "+networkInfo.isConnected()+"locked="+this.lockedToNetwork);
+            isNameSocial = true;
+            //final ConnectivityManager cm = this.connectivityManager;
+            //networkStuff(cm);
+
+
+             final ConnectivityManager cm = this.connectivityManager;
+            this.cordova.getThreadPool().execute(new Runnable() {
+
+                public void run() {
+                    try {
+                        networkStuff(cm);
+                    }
+                    catch(Exception ex){
+                        Log.d("ABC", "WifiWizard Excpetion in thread calling networkStuff "+ex);
+                    }
+                };
+            });
+
+        }
+        else if(!networkInfo.isConnected()){
+           // Log.d("ABC", "WifiWizard networkstuff myLock FALSE ");
+            int currentapiVersion = android.os.Build.VERSION.SDK_INT;
+            if (currentapiVersion <= android.os.Build.VERSION_CODES.LOLLIPOP) {
+                // Do something for lollipop and below versions
+                 this.connectivityManager.setProcessDefaultNetwork(null);
+            }else {
+                this.connectivityManager.bindProcessToNetwork(null);
+            }
+            myLock = false;
+        }
+    }//on receive
+
+    private void networkStuff(ConnectivityManager cm){
+        try{
+           // final ConnectivityManager cm = this.connectivityManager;
+           //Log.d("ABC", "WifiWizard networkstuff 1111 ");
+
+            NetworkInfo activeInfo = connectivityManager.getActiveNetworkInfo();
+            String activeName = activeInfo.getExtraInfo();
+          //  Network active = connectivityManager.getActiveNetwork();
+          //  Network boundProc = connectivityManager.getBoundNetworkForProcess();
+            //Log.d("ABC", "WifiWizard networkstuff 2222XXX BOUND PROC = " + boundProc +",active="+active);
+
+
+            //Log.d("ABC", "WifiWizard networkstuff 2222 " + activeInfo);
+          //  if(activeInfo.getExtraInfo().toLowerCase().indexOf("social")<0) {
+
+            for (Network net : cm.getAllNetworks()) {
+                NetworkInfo netInfo = cm.getNetworkInfo(net);
+              //  Log.d("ABC","WifiWizard found networks "+net +","+netInfo);
+              //  if(netInfo.isConnected() && (!net.equals(active))) {//Crashes on Mi4i soe next line
+                  if(netInfo.isConnected() && (netInfo.getExtraInfo().toLowerCase().indexOf("social")>=0)){// (!netInfo.getExtraInfo().equals(activeName))) {
+
+                boolean bindres = false;
+                   // Log.d("ABC", "WifiWizard networkstuff BINDING TO net Info =" + netInfo);
+                    int currentapiVersion = android.os.Build.VERSION.SDK_INT;
+                    if (currentapiVersion <= android.os.Build.VERSION_CODES.LOLLIPOP) {
+                        // Do something for lollipop and below versions
+                        //   Log.d("ABC", "WifiWizard networkstuff 555 ");
+
+
+                        //  Log.d("ABC", "WifiWizard networkstuff 666 ");
+
+                        bindres = cm.setProcessDefaultNetwork(net);
+                        Log.d("ABC", "WifiWizard networkstuff bindRES " + bindres);
+
+                    } else {
+                        bindres = cm.bindProcessToNetwork(net);
+                        Log.d("ABC", "WifiWizard networkstuff bindRES " + bindres);
+                    }
+                    if(bindres){
+                        Log.d("ABC", "WifiWizard networkstuff bindRES ABC 1 " + bindres);
+
+                        ABC.TOY_WIFI_CONNECTION_STATUS = 1;
+                    }else{
+                        Log.d("ABC", "WifiWizard networkstuff ABC 0 bindRES " + bindres);
+
+                        ABC.TOY_WIFI_CONNECTION_STATUS = 0;
+                    }
+                    break;
+                }
+            }//for
+        }
+        catch(Exception ex){
+            Log.d("ABC","WifiWizard Active Network Stuff Exception "+ex);
+
+        }
+
+    }//network stuff
+
+};//class ABC ends
 
 public class WifiWizard extends CordovaPlugin {
 
@@ -49,12 +193,29 @@ public class WifiWizard extends CordovaPlugin {
 
     private WifiManager wifiManager;
     private CallbackContext callbackContext;
+    private ConnectivityManager connectivityManager;
+    private BroadcastReceiver receiver;
 
     @Override
     public void initialize(CordovaInterface cordova, CordovaWebView webView) {
         super.initialize(cordova, webView);
         this.wifiManager = (WifiManager) cordova.getActivity().getSystemService(Context.WIFI_SERVICE);
-    }
+        this.connectivityManager = (ConnectivityManager) cordova.getActivity().getSystemService(Context.CONNECTIVITY_SERVICE);
+
+        // We need to listen to wifi change events
+        IntentFilter intentFilter = new IntentFilter();
+        intentFilter.addAction(WifiManager.NETWORK_STATE_CHANGED_ACTION);
+
+        if (this.receiver == null) {
+            this.receiver = new ABC(this.connectivityManager,cordova,this.wifiManager);
+           // cordova.getThreadPool().execute(new Runnable(this.receiver) {
+             //   public void run() {
+                    webView.getContext().registerReceiver(this.receiver, intentFilter);
+               // }
+            //});
+
+        }//if
+    }//initialize
 
     @Override
     public boolean execute(String action, JSONArray data, CallbackContext callbackContext)
@@ -238,14 +399,7 @@ public class WifiWizard extends CordovaPlugin {
         }
     }
 
-    /**
-     *    This method connects a network.
-     *
-     *    @param    callbackContext        A Cordova callback context
-     *    @param    data                JSON Array, with [0] being SSID to connect
-     *    @return    true if network connected, false if failed
-     */
-    private boolean connectNetwork(CallbackContext callbackContext, JSONArray data) {
+    private boolean connectNetwork(final CallbackContext callbackContext, JSONArray data) {
         Log.d(TAG, "WifiWizard: connectNetwork entered.");
         if(!validateData(data)) {
             callbackContext.error("WifiWizard: connectNetwork invalid data");
@@ -264,6 +418,14 @@ public class WifiWizard extends CordovaPlugin {
         }
 
         int networkIdToConnect = ssidToNetworkId(ssidToConnect);
+        Log.d(TAG, "WifiWizard: ssidToNetwork Gave "+networkIdToConnect);
+
+
+        boolean toyNetworkCheck = false;
+        if(ssidToConnect.toLowerCase().indexOf("socialtoywifi") >0){
+            ABC.TOY_WIFI_CONNECTION_STATUS = -1;
+            toyNetworkCheck = true;
+        }
 
         if (networkIdToConnect >= 0) {
             // We disable the network before connecting, because if this was the last connection before
@@ -274,7 +436,47 @@ public class WifiWizard extends CordovaPlugin {
             SupplicantState supState;
             WifiInfo wifiInfo = wifiManager.getConnectionInfo();
             supState = wifiInfo.getSupplicantState();
-            callbackContext.success(supState.toString());
+
+            if(toyNetworkCheck){
+                Log.d(TAG, "WifiWizard: connectNetwork toywifi check");
+
+             //   cordova.getActivity().runOnUiThread(new Runnable() {
+               cordova.getThreadPool().execute(new Runnable() {
+                    public void run() {
+                        int i = 0;
+                        while(ABC.TOY_WIFI_CONNECTION_STATUS == -1){
+
+                            i++;
+                            if(i >=6){
+                                break;
+                            }
+                            try{
+                                Log.d("ABC","WifiWizard Thread sleep X");
+                                Thread.sleep(2000);
+                            }
+                            catch(Exception ex){
+                                Log.d("ABC","WifiWizard Exception Thread sleep - connectNetwork");
+                            }
+                        }
+                        Log.d(TAG, "WifiWizard: Sleep Over ABC.TOY_WIFI_CONN_STATUS ="+ABC.TOY_WIFI_CONNECTION_STATUS);
+
+                        if(ABC.TOY_WIFI_CONNECTION_STATUS == 1)
+                            callbackContext.success("connect and bind OK"); // Thread-safe.
+                        else{
+                            Log.d("ABC","WifiWizard Conection to WIFI Failed");
+                            callbackContext.error("connect & bind failed"); // Thread-safe.
+
+                        }
+                    }//run
+                });
+               // callbackContext.success("bindprocess to network OK"); // Thread-safe.
+
+            }
+            else {
+                Log.d(TAG, "WifiWizard: Normal connectNetwork return success");
+
+                callbackContext.success(supState.toString());
+            }
             return true;
 
         }else{
@@ -310,18 +512,41 @@ public class WifiWizard extends CordovaPlugin {
 
         int networkIdToDisconnect = ssidToNetworkId(ssidToDisconnect);
 
-        if (networkIdToDisconnect > 0) {
+
+
+    if (networkIdToDisconnect > 0) {
             wifiManager.disableNetwork(networkIdToDisconnect);
             callbackContext.success("Network " + ssidToDisconnect + " disconnected!");
-            return true;
+
+        boolean ssidIsToyNetwork = false;
+        if(ssidToDisconnect.toLowerCase().indexOf("socialtoywifi") >0){
+            ssidIsToyNetwork = true;
         }
-        else {
+
+        if(ssidIsToyNetwork){
+            int currentapiVersion = android.os.Build.VERSION.SDK_INT;
+            if (currentapiVersion <= android.os.Build.VERSION_CODES.LOLLIPOP){
+
+                // Do something for lollipop and below versions
+                // if(this.connectivityManager.getBoundNetworkForProcess()!= null)
+
+                this.connectivityManager.setProcessDefaultNetwork(null);
+            }
+            else{
+                //if(this.connectivityManager.getBoundNetworkForProcess()!= null)
+                this.connectivityManager.bindProcessToNetwork(null);
+            }
+
+        }
+        return true;
+     }
+     else {
             callbackContext.error("Network " + ssidToDisconnect + " not found!");
             Log.d(TAG, "WifiWizard: Network not found to disconnect.");
             return false;
-        }
-    }
+     }
 
+    }
     /**
      *    This method disconnects current network.
      *
@@ -514,8 +739,12 @@ public class WifiWizard extends CordovaPlugin {
 
         // For each network in the list, compare the SSID with the given one
         for (WifiConfiguration test : currentNetworks) {
+           // Log.d("ABC","WifiWizard Available Configured SSIDS - "+test.SSID +"networkid="+test.networkId);
             if ( test.SSID.equals(ssid) ) {
-                networkId = test.networkId;
+                if(networkId < test.networkId) {
+                    networkId = test.networkId;
+                }
+              //  Log.d("ABC","WifiWizard SSIDTONETWORKID ssid="+ssid+"networkid ="+networkId);
             }
         }
 
